@@ -8,16 +8,16 @@ import numpy as np
 
 src_sp = spm.SentencePieceProcessor()
 trg_sp = spm.SentencePieceProcessor()
-src_sp.Load(f"{SP_DIR}/{src_model_prefix}.model")
-trg_sp.Load(f"{SP_DIR}/{trg_model_prefix}.model")
+src_sp.load(f"{SP_DIR}/{src_model_prefix}.model")
+trg_sp.load(f"{SP_DIR}/{trg_model_prefix}.model")
 
 
-def get_data_loader(file_name):
-    print(f"Getting source/target {file_name}...")
-    with open(f"{DATA_DIR}/{SRC_DIR}/{file_name}", 'r') as f:
+def get_data_loader(src_file_name, trg_file_name):
+    print(f"Getting source/target data...")
+    with open(f"{DATA_DIR}/{SRC_DIR}/{src_file_name}", 'r') as f:
         src_text_list = f.readlines()
 
-    with open(f"{DATA_DIR}/{TRG_DIR}/{file_name}", 'r') as f:
+    with open(f"{DATA_DIR}/{TRG_DIR}/{trg_file_name}", 'r') as f:
         trg_text_list = f.readlines()
 
     print("Tokenizing & Padding src data...")

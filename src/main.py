@@ -62,8 +62,8 @@ class Manager():
 
             # Load dataloaders
             print("Loading dataloaders...")
-            self.train_loader = get_data_loader(TRAIN_NAME)
-            self.valid_loader = get_data_loader(VALID_NAME)
+            self.train_loader = get_data_loader(SRC_TRAIN_NAME, TRG_TRAIN_NAME)
+            self.valid_loader = get_data_loader(SRC_VALID_NAME, TRG_VALID_NAME)
 
         print("Setting finished.")
 
@@ -87,7 +87,7 @@ class Manager():
                 trg_output_shape = trg_output.shape
                 self.optim.zero_grad()
                 loss = self.criterion(
-                    output.view(-1, sp_vocab_size),
+                    output.view(-1, sp_src_vocab_size),
                     trg_output.view(trg_output_shape[0] * trg_output_shape[1])
                 )
 
@@ -148,7 +148,7 @@ class Manager():
 
                 trg_output_shape = trg_output.shape
                 loss = self.criterion(
-                    output.view(-1, sp_vocab_size),
+                    output.view(-1, sp_trg_vocab_size),
                     trg_output.view(trg_output_shape[0] * trg_output_shape[1])
                 )
 
@@ -169,14 +169,12 @@ class Manager():
         return mean_valid_loss, f"{hours}hrs {minutes}mins {seconds}secs"
 
     def inference(self, input_sentence, method):
-        print("Inference starts.")
         self.model.eval()
 
-        print("Loading sentencepiece tokenizer...")
         src_sp = spm.SentencePieceProcessor()
         trg_sp = spm.SentencePieceProcessor()
-        src_sp.Load(f"{SP_DIR}/{src_model_prefix}.model")
-        trg_sp.Load(f"{SP_DIR}/{trg_model_prefix}.model")
+        src_sp.load(f"{SP_DIR}/{src_model_prefix}.model")
+        trg_sp.load(f"{SP_DIR}/{trg_model_prefix}.model")
 
         print("Preprocessing input sentence...")
         tokenized = src_sp.EncodeAsIds(input_sentence)
@@ -326,7 +324,7 @@ if __name__=='__main__':
     parser.add_argument('--mode', required=True, help="train or inference?")
     parser.add_argument('--ckpt_name', required=False, help="best checkpoint file")
     parser.add_argument('--input', type=str, required=False, help="input sentence when inferencing")
-    parser.add_argument('--decode', type=str, required=True, default="greedy", help="greedy or beam?")
+    parser.add_argument('--decode', type=str, required=False, default="greedy", help="greedy or beam?")
 
     args = parser.parse_args()
 
