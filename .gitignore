@@ -137,6 +137,7 @@ data/
 # ckpt model
 saved_model/
 onnx_test/
+onnx_test2/
 
 # tensorboard log
 runs/
