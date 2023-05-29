@@ -15,10 +15,10 @@ trg_sp.load(f"{SP_DIR}/{trg_model_prefix}.model")
 def get_data_loader(src_file_name, trg_file_name):
     print(f"Getting source/target data...")
     with open(f"{DATA_DIR}/{SRC_DIR}/{src_file_name}", 'r') as f:
-        src_text_list = f.readlines()[:NUM_TRAIN]
+        src_text_list = f.readlines()
 
     with open(f"{DATA_DIR}/{TRG_DIR}/{trg_file_name}", 'r') as f:
-        trg_text_list = f.readlines()[:NUM_TRAIN]
+        trg_text_list = f.readlines()
 
     print("Tokenizing & Padding src data...")
     src_list = process_src(src_text_list) # (sample_num, L)

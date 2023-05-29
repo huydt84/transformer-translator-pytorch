@@ -14,7 +14,7 @@ SRC_TEST_NAME = 'test.en'
 TRG_TRAIN_NAME = 'train.vi'
 TRG_VALID_NAME = 'dev.vi'
 TRG_TEST_NAME = 'test.vi'
-NUM_TRAIN = 10000
+NUM_TRAIN = 30000
 
 # Parameters for sentencepiece tokenizer
 pad_id = 0
@@ -29,7 +29,7 @@ character_coverage = 1.0
 model_type = 'bpe'
 
 # Parameters for Transformer & training
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 # device = 'cpu'
 learning_rate = 1e-4
 betas = (0.9, 0.98)
@@ -42,6 +42,6 @@ d_model = 512
 d_ff = 1024
 d_k = d_model // num_heads
 drop_out_rate = 0.1
-num_epochs = 1
+num_epochs = 10
 beam_size = 3
 ckpt_dir = 'saved_model'

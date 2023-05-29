@@ -136,6 +136,7 @@ data/
 
 # ckpt model
 saved_model/
+saved_model_sophia/
 onnx_test/
 onnx_test2/
 

@@ -4,6 +4,7 @@ from custom_data import *
 from transformer import *
 from data_structure import *
 from torch import nn
+from Sophia import SophiaG 
 
 import torch
 import sys, os
@@ -14,31 +15,17 @@ import copy
 import heapq
 import sentencepiece as spm
 
+
 class Manager():
     def __init__(self, is_train=True, ckpt_name=None):
-        # Load vocabs
-        print("Loading vocabs...")
-        self.src_i2w = {}
-        self.trg_i2w = {}
-
-        with open(f"{SP_DIR}/{src_model_prefix}.vocab") as f:
-            lines = f.readlines()
-        for i, line in enumerate(lines):
-            word = line.strip().split('\t')[0]
-            self.src_i2w[i] = word
-
-        with open(f"{SP_DIR}/{trg_model_prefix}.vocab") as f:
-            lines = f.readlines()
-        for i, line in enumerate(lines):
-            word = line.strip().split('\t')[0]
-            self.trg_i2w[i] = word
-
-        print(f"The size of src vocab is {len(self.src_i2w)} and that of trg vocab is {len(self.trg_i2w)}.")
-
+        
         # Load Transformer model & Adam optimizer
         print("Loading Transformer model & Adam optimizer...")
-        self.model = Transformer(src_vocab_size=len(self.src_i2w), trg_vocab_size=len(self.trg_i2w)).to(device)
-        self.optim = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        self.model = Transformer(src_vocab_size=sp_src_vocab_size, trg_vocab_size=sp_trg_vocab_size, d_model=d_model).to(device)
+        # self.optim = SophiaG(self.model.parameters(), lr=learning_rate/2, betas=(0.965, 0.99), rho = 0.03, weight_decay=1e-1)
+        self.optim = torch.optim.AdamW(self.model.parameters(), lr=learning_rate, betas=betas, eps=eps)
+
+        self.scaler = torch.cuda.amp.GradScaler()
         self.best_loss = sys.float_info.max
 
         if ckpt_name is not None:
@@ -85,14 +72,21 @@ class Manager():
                 output = self.model(src_input, trg_input, e_mask, d_mask) # (B, L, vocab_size)
 
                 trg_output_shape = trg_output.shape
-                self.optim.zero_grad()
-                loss = self.criterion(
-                    output.view(-1, sp_src_vocab_size),
-                    trg_output.view(trg_output_shape[0] * trg_output_shape[1])
-                )
 
-                loss.backward()
-                self.optim.step()
+                self.optim.zero_grad() 
+                with torch.autocast(device_type='cuda', dtype=torch.float16):   
+                    loss = self.criterion(
+                        output.view(-1, sp_src_vocab_size),
+                        trg_output.view(trg_output_shape[0] * trg_output_shape[1])
+                    )
+
+                self.scaler.scale(loss).backward() 
+                self.scaler.unscale_(self.optim)
+            
+                nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5)
+                
+                self.scaler.step(self.optim)
+                self.scaler.update()
 
                 train_losses.append(loss.item())
                 
@@ -126,7 +120,7 @@ class Manager():
                 print(f"***** Current best checkpoint is saved. *****")
 
             print(f"Best valid loss: {self.best_loss}")
-            print(f"Valid loss: {valid_loss} || One epoch training time: {valid_time}")
+            print(f"Valid loss: {valid_loss} || One epoch validating time: {valid_time}")
 
         print(f"Training finished!")
         
@@ -184,8 +178,6 @@ class Manager():
         start_time = datetime.datetime.now()
 
         print("Encoding input sentence...")
-        src_data = self.model.src_embedding(src_data)
-        src_data = self.model.positional_encoder(src_data)
         e_output = self.model.encoder(src_data, e_mask) # (1, L, d_model)
 
         if method == 'greedy':
@@ -217,17 +209,11 @@ class Manager():
             nopeak_mask = torch.tril(nopeak_mask)  # (1, L, L) to triangular shape
             d_mask = d_mask & nopeak_mask  # (1, L, L) padding false
 
-            trg_embedded = self.model.trg_embedding(last_words.unsqueeze(0))
-            trg_positional_encoded = self.model.positional_encoder(trg_embedded)
-            decoder_output = self.model.decoder(
-                trg_positional_encoded,
+            output = self.model.decoder(
+                last_words.unsqueeze(0),
                 e_output,
                 e_mask,
                 d_mask
-            ) # (1, L, d_model)
-
-            output = self.model.softmax(
-                self.model.output_linear(decoder_output)
             ) # (1, L, trg_vocab_size)
 
             output = torch.argmax(output, dim=-1) # (1, L)
@@ -268,17 +254,11 @@ class Manager():
                     nopeak_mask = torch.tril(nopeak_mask) # (1, L, L) to triangular shape
                     d_mask = d_mask & nopeak_mask # (1, L, L) padding false
                     
-                    trg_embedded = self.model.trg_embedding(trg_input.unsqueeze(0))
-                    trg_positional_encoded = self.model.positional_encoder(trg_embedded)
-                    decoder_output = self.model.decoder(
-                        trg_positional_encoded,
+                    output = self.model.decoder(
+                        trg_input.unsqueeze(0),
                         e_output,
                         e_mask,
                         d_mask
-                    ) # (1, L, d_model)
-
-                    output = self.model.softmax(
-                        self.model.output_linear(decoder_output)
                     ) # (1, L, trg_vocab_size)
                     
                     output = torch.topk(output[0][pos], dim=-1, k=beam_size)
