@@ -1,8 +1,15 @@
 # transformer-translator-pytorch
 This is a machine translation project using the basic **Transformer** introduced in *Attention is all you need*[[1]](#1).
 
-I used English-French corpus provided by "European Parliament Proceedings Parallel Corpus 1996-2011"[[2]](#2).
-(You can use any other datasets, of course.)
+The original author used English-French corpus provided by "European Parliament Proceedings Parallel Corpus 1996-2011"[[2]](#2).
+
+I used PhoMT [[3]](#3) dataset for English-Vietnamese translation task
+
+# Update 29/5/2023:
+- Reformat model to only encoder-decoder
+- Mixed-precision model training
+- Add inference with Bleu score calculation
+- Convert model to ONNX representation
 
 <br/>
 
@@ -20,15 +27,19 @@ The description of each variable is as follows.
 
 Argument | Type | Description | Default
 ---------|------|---------------|------------
-`DATA_DIR` | `str` | Name of the parent directory where data files are stored. | `'data'` 
+`DATA_DIR` | `str` | Name of the parent directory where data files are stored. | `data` 
 `SP_DIR` | `str` | Path for the directory which contains the sentence tokenizers and vocab files. | `f'{DATA_DIR}/sp'` 
-`SRC_DIR` | `str` | Name of the directory which contains the source data files. | `'src'` 
-`TRG_DIR` | `str` | Name of the directory which contains the target data files. | `'trg'` 
+`SRC_DIR` | `str` | Name of the directory which contains the source data files. | `src/envi` 
+`TRG_DIR` | `str` | Name of the directory which contains the target data files. | `trg/envi` 
+`ONNX_DIR` | `str` | Name of the directory which contains ONNX models | `onnx_test`
 `SRC_RAW_DATA_NAME` | `str` | Name of the source raw data file. | `raw_data.src` 
 `TRG_RAW_DATA_NAME` | `str` | Name of the target raw data file. | `raw_data.trg` 
-`TRAIN_NAME` | `str` | Name of the train data file. | `train.txt` 
-`VALID_NAME` | `str` | Name of the validation data file. | `valid.txt` 
-`TEST_NAME` | `str` | Name of the test data file. | `test.txt` 
+`SRC_TRAIN_NAME` | `str` | Name of the source train data file. | `train.en` 
+`SRC_VALID_NAME` | `str` | Name of the source validation data file. | `dev.en` 
+`SRC_TEST_NAME` | `str` | Name of the source test data file. | `test.en` 
+`TRG_TRAIN_NAME` | `str` | Name of the target train data file. | `train.vi` 
+`TRG_VALID_NAME` | `str` | Name of the target validation data file. | `dev.vi` 
+`TRG_TEST_NAME` | `str` | Name of the target test data file. | `test.vi` 
 
 <br/>
 
@@ -42,9 +53,10 @@ Argument | Type | Description | Default
 | `unk_id`             | `int`   | The index of unknown token.                                  | `3`       |
 | `src_model_prefix`   | `str`   | The file name prefix for the source language tokenizer & vocabulary. | `src_sp`  |
 | `trg_model_prefix`   | `str`   | The file name prefix for the target language tokenizer & vocabulary. | `trg_sp`  |
-| `sp_vocab_size`      | `int`   | The size of vocabulary.                                      | `16000`   |
-| `character_coverage` | `float` | The value for character coverage.                            | `1.0`     |
-| `model_type`         | `str`   | The type of sentencepiece model. (`unigram`, `bpe`, `char`, or `word`) | `unigram` |
+| `sp_src_vocab_size`  | `int`   | The size of vocabulary of source language.                   | `64000`   |
+| `sp_trg_vocab_size`  | `int`   | The size of vocabulary of target language.                   | `64000`   |
+| `character_coverage` | `float` | The value for character coverage (between `0.0` and `1.0`).  | `1.0`     |
+| `model_type`         | `str`   | The type of sentencepiece model. (`unigram`, `bpe`, `char`, or `word`) | `bpe` |
 
 <br/>
 
@@ -54,16 +66,18 @@ Argument | Type | Description | Default
 | --------------- | -------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | `device`        | `torch.device` | The device type. (CUDA or CPU)                               | `torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')` |
 | `learning_rate` | `float`        | The learning rate.                                           | `1e-4`                                                       |
-| `batch_size`    | `int`          | The batch size.                                              | `80`                                                         |
-| `seq_len`       | `int`          | The maximum length of a sentence.                            | `200`                                                        |
+| `betas`         | `tuple`        | Exponential moving average of gradient and its square        | `(0.9, 0.98)`                                                |
+| `eps`           | `float`        | Small number added to denominator to prevent divided by 0.   | `1e-4`                                                       |
+| `batch_size`    | `int`          | The batch size.                                              | `16`                                                         |
+| `seq_len`       | `int`          | The maximum length of a sentence.                            | `256`                                                        |
 | `num_heads`     | `int`          | The number of heads for Multi-head attention.                | `8`                                                          |
-| `num_layers`    | `int`          | The number of layers in the encoder & the decoder.           | `6`                                                          |
+| `num_layers`    | `int`          | The number of layers in the encoder & the decoder.           | `3`                                                          |
 | `d_model`       | `int`          | The size of hidden states in the model.                      | `512`                                                        |
-| `d_ff`          | `int`          | The size of intermediate  hidden states in the feed-forward layer. | `2048`                                                       |
+| `d_ff`          | `int`          | The size of intermediate  hidden states in the feed-forward layer. | `1024`                                                       |
 | `d_k`           | `int`          | The size of dimension which a single head should take. (Make sure that `d_model` is divided into `num_heads`.) | `d_model // num_heads`                                       |
 | `drop_out_rate` | `float`        | The dropout rate.                                            | `0.1`                                                        |
 | `num_epochs`    | `int`          | The total number of iterations.                              | `10`                                                         |
-| `beam_size`     | `int`          | The beam size. (Only used when the beam search is used at inference time.) | `8`                                                          |
+| `beam_size`     | `int`          | The beam size. (Only used when the beam search is used at inference time.) | `3`                                                          |
 | `ckpt_dir`      | `str`          | The path for saved checkpoints.                              | `saved_model`                                                |
 
 <br/>
@@ -72,17 +86,30 @@ Argument | Type | Description | Default
 
 ### How to run
 
-1. Download the dataset from ["European Parliament Proceedings Parallel Corpus 1996-2011"](https://www.statmt.org/europarl/). 
-	
-   You can choose any parallel corpus you want. (I chose English-French for example.)
+1. Download the dataset from ["PhoMT: A High-Quality and Large-Scale Benchmark Dataset for Vietnamese-English Machine Translation"](https://github.com/VinAIResearch/PhoMT) 
    
-   Download it and extract it until you have two raw text files, `europarl-v7.SRC-TRG.SRC` and `europarl-v7.SRC-TRG.TRG`.
-   
-   Make `DATA_DIR` directory in the root directory and put raw texts in it.
+   Make `DATA_DIR` directory in the root directory and put raw texts in it. Raw text can be training set, or any corpus in corresponding languages.
    
    Name each ``SRC_RAW_DATA_NAME`` and ``TRG_RAW_DATA_NAME``.
+
+   Save dataset in folder so that the structure of `DATA_DIR` directory likes below. I create `envi` folder to discriminate with other language pairs added in the future
+   
+   - `data`
+     - `src`
+       - `envi`
+         - `train.en`
+         - `dev.en`
+         - `test.en`
+     - `trg`
+       - `envi`         
+         - `train.vi`
+         - `dev.vi`
+         - `test.vi`
+     - `raw_data.src`
+     - `raw_data.tar`   
    
    Of course, you can use additional datasets and just make sure that the formats/names of raw data files are same as those of above datasets. 
+
    
    <br/>
    
@@ -104,22 +131,28 @@ Argument | Type | Description | Default
 
    Each model and vocab files are for source language and target language.
 
-   In default setting, the structure of whole data directory should be like below.
+   In default setting, the structure of whole data directory should be like below. 
 
    - `data`
-     - `sp`
-       - `src_sp.model`
-       - `src_sp.vocab`
-       - `tar_sp.model`
-       - `tar_sp.vocab`
+      - `sp`
+         - `src_sp.model`
+         - `src_sp.vocab`
+         - `tar_sp.model`
+         - `tar_sp.vocab`
      - `src`
-       - `train.txt`
-       - `valid.txt`
+       - `envi`
+         - `train.en`
+         - `dev.en`
+         - `test.en`
      - `trg`
-       - `train.txt`
-       - `valid.txt`
+       - `envi`         
+         - `train.vi`
+         - `dev.vi`
+         - `test.vi`
      - `raw_data.src`
-     - `raw_data.tar`
+     - `raw_data.tar`  
+
+   You can delete vocab files, I modified the code so that `.vocab` file is not mandatory.
 
    <br/>
 
@@ -152,8 +185,11 @@ Argument | Type | Description | Default
 <a id="1">[1]</a> 
 *Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I. (2017). Attention is all you need. In Advances in neural information processing systems (pp. 5998-6008)*. ([http://papers.nips.cc/paper/7181-attention-is-all-you-need](http://papers.nips.cc/paper/7181-attention-is-all-you-need))
 
-<a id="2">[2]
+<a id="2">[2]</a>
 *Koehn, P. (2005, September). Europarl: A parallel corpus for statistical machine translation. In MT summit (Vol. 5, pp. 79-86)*. ([http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.459.5497&rep=rep1&type=pdf](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.459.5497&rep=rep1&type=pdf))
+
+<a id="3">[3]</a>
+*Long Doan and Linh The Nguyen and Nguyen Luong Tran and Thai Hoang and Dat Quoc Nguyen. (2021). PhoMT: A High-Quality and Large-Scale Benchmark Dataset for Vietnamese-English Machine Translation. In Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing (pp. 4495-4503)*. ([https://aclanthology.org/2021.emnlp-main.369/](https://aclanthology.org/2021.emnlp-main.369/))
 
 <br/>
 

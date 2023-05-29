@@ -14,7 +14,6 @@ SRC_TEST_NAME = 'test.en'
 TRG_TRAIN_NAME = 'train.vi'
 TRG_VALID_NAME = 'dev.vi'
 TRG_TEST_NAME = 'test.vi'
-NUM_TRAIN = 30000
 
 # Parameters for sentencepiece tokenizer
 pad_id = 0

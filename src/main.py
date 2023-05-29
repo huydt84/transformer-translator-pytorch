@@ -172,7 +172,7 @@ class Manager():
 
         print("Preprocessing input sentence...")
         tokenized = src_sp.EncodeAsIds(input_sentence)
-        src_data = torch.LongTensor(pad_or_truncate(tokenized)).unsqueeze(0).to(device) # (1, L)
+        src_data = torch.LongTensor(pad_or_truncate(tokenized + [eos_id])).unsqueeze(0).to(device) # (1, L)
         e_mask = (src_data != pad_id).unsqueeze(1).to(device) # (1, 1, L)
 
         start_time = datetime.datetime.now()

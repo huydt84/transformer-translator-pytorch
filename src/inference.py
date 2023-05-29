@@ -2,7 +2,7 @@ from unicodedata import name
 from tqdm import tqdm
 from constants import *
 from custom_data import *
-from transformer2 import *
+from transformer import *
 from data_structure import *
 from torch import nn
 from Sophia import SophiaG 
