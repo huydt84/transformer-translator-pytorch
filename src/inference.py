@@ -12,11 +12,23 @@ import sys, os
 import numpy as np
 import argparse
 import datetime
+import re
 import copy
 import heapq
 import sentencepiece as spm
 from underthesea import text_normalize
 from torchmetrics import BLEUScore
+
+def split_end(input_sentence):
+    split_sentence = input_sentence.strip().split("。")
+    split_sentence = [s+"。" for s in split_sentence]
+    split_sentence[-1] = split_sentence[-1][:-1]
+    return split_sentence
+
+def translate(model, input_sentence, method):
+    split_sentence = split_end(input_sentence)
+    result = " ".join([inference(model, sentence, method) for sentence in split_sentence if len(sentence) > 0])
+    return result.strip()
 
 def inference(model, input_sentence, method):
     src_sp = spm.SentencePieceProcessor()
@@ -133,33 +145,41 @@ def beam_search(model, e_output, e_mask, trg_sp):
 def calculate_bleu(model, method, list_src, list_trg):
     references, predictions = [], []
     for (src, trg) in tqdm(zip(list_src, list_trg)):
-        pred = inference(model, src, method)
-        pred = text_normalize(pred)
-        predictions.append(pred)
-        trg = text_normalize(trg)
-        references.append([trg])      
+        pred = inference(model, src.strip(), method)
+        predictions.append(text_normalize(pred))
+        trg = text_normalize(trg.capitalize())
+        references.append([trg])     
     bleu = BLEUScore()
     return bleu(predictions, references) 
 
+
 if __name__=='__main__':
     model = Transformer(src_vocab_size=sp_src_vocab_size, trg_vocab_size=sp_trg_vocab_size, d_model=d_model).to(device)
+    encoder_total_params = sum(p.numel() for p in model.encoder.parameters())
+    decoder_total_params = sum(p.numel() for p in model.decoder.parameters())
+    print(encoder_total_params, decoder_total_params)
 
     print("Loading checkpoint...")
-    checkpoint = torch.load("saved_model_sophia/best_ckpt.tar")
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
+    for i in range(18, 19):
+        print(f"######### Epoch: {i} #########")
+        checkpoint = torch.load(f"{ckpt_dir}/ckpt_{i}_javi2.tar")
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.eval()
 
-    input_sentence = "Hello my name is John"
-    print(inference(model, input_sentence, method="greedy"))
+        input_sentence = "お客様がたくさんいます。その中で先生のクラスメートと友達が多いです。\n"
+        pred = translate(model, input_sentence, method="greedy")
+        print(text_normalize(pred))
 
-    print(f"Getting source/target data...")
-    with open(f"{DATA_DIR}/{SRC_DIR}/{SRC_TEST_NAME}", 'r') as f:
-        src_text_list = f.readlines()
+        print(f"Getting source/target data...")
+        with open(f"{DATA_DIR}/{SRC_DIR}/{SRC_TEST_NAME}", 'r') as f:
+            src_text_list = f.readlines()
 
-    with open(f"{DATA_DIR}/{TRG_DIR}/{TRG_TEST_NAME}", 'r') as f:
-        trg_text_list = f.readlines()
+        with open(f"{DATA_DIR}/{TRG_DIR}/{TRG_TEST_NAME}", 'r') as f:
+            trg_text_list = f.readlines()
 
-    print(calculate_bleu(model, "greedy", src_text_list, trg_text_list))
+        b = calculate_bleu(model, "greedy", src_text_list, trg_text_list).item()
+        with open("bleu-tatoeba.txt", "a", encoding="utf-8") as f:
+            f.write(f"{b} ckpt_{i}_javi2\n")
 
     
 

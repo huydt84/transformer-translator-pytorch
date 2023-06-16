@@ -135,13 +135,16 @@ dmypy.json
 data/
 
 # ckpt model
-saved_model/
-saved_model_sophia/
-onnx_test/
-onnx_test2/
+model*/
+saved_model*/
+onnx_test*/
+sq*/
 
 # tensorboard log
 runs/
+
+# wandb log
+wandb/
 
 # nohup.out
 nohup.out

@@ -58,7 +58,7 @@ def process_trg(text_list):
     input_tokenized_list = []
     output_tokenized_list = []
     for text in tqdm(text_list):
-        tokenized = trg_sp.EncodeAsIds(text.strip())
+        tokenized = trg_sp.EncodeAsIds(text.strip().capitalize())
         trg_input = [sos_id] + tokenized
         trg_output = tokenized + [eos_id]
         input_tokenized_list.append(pad_or_truncate(trg_input))

@@ -14,19 +14,37 @@ import datetime
 import copy
 import heapq
 import sentencepiece as spm
+import pytorch_warmup as warmup
+from transformers import get_cosine_schedule_with_warmup
 
 
 class Manager():
     def __init__(self, is_train=True, ckpt_name=None):
+        if is_train:
+            # Load loss function
+            print("Loading loss function...")
+            self.criterion = nn.NLLLoss()
+
+            # Load dataloaders
+            print("Loading dataloaders...")
+            self.train_loader = get_data_loader(SRC_TRAIN_NAME, TRG_TRAIN_NAME)
+            self.valid_loader = get_data_loader(SRC_VALID_NAME, TRG_VALID_NAME)
         
         # Load Transformer model & Adam optimizer
         print("Loading Transformer model & Adam optimizer...")
         self.model = Transformer(src_vocab_size=sp_src_vocab_size, trg_vocab_size=sp_trg_vocab_size, d_model=d_model).to(device)
-        # self.optim = SophiaG(self.model.parameters(), lr=learning_rate/2, betas=(0.965, 0.99), rho = 0.03, weight_decay=1e-1)
+        # self.optim = SophiaG(self.model.parameters(), lr=learning_rate, betas=(0.965, 0.99), rho = 0.03, weight_decay=1e-1)
         self.optim = torch.optim.AdamW(self.model.parameters(), lr=learning_rate, betas=betas, eps=eps)
+        self.scheduler = get_cosine_schedule_with_warmup(
+            self.optim,
+            num_warmup_steps=warmup_step,
+            num_training_steps=len(self.train_loader) * num_epochs,
+        )
 
         self.scaler = torch.cuda.amp.GradScaler()
         self.best_loss = sys.float_info.max
+        
+        print(sum(p.numel() for p in self.model.parameters()))
 
         if ckpt_name is not None:
             assert os.path.exists(f"{ckpt_dir}/{ckpt_name}"), f"There is no checkpoint named {ckpt_name}."
@@ -41,17 +59,7 @@ class Manager():
             for p in self.model.parameters():
                 if p.dim() > 1:
                     nn.init.xavier_uniform_(p)
-
-        if is_train:
-            # Load loss function
-            print("Loading loss function...")
-            self.criterion = nn.NLLLoss()
-
-            # Load dataloaders
-            print("Loading dataloaders...")
-            self.train_loader = get_data_loader(SRC_TRAIN_NAME, TRG_TRAIN_NAME)
-            self.valid_loader = get_data_loader(SRC_VALID_NAME, TRG_VALID_NAME)
-
+                    
         print("Setting finished.")
 
     def train(self):
@@ -87,6 +95,8 @@ class Manager():
                 
                 self.scaler.step(self.optim)
                 self.scaler.update()
+                
+                self.scheduler.step()
 
                 train_losses.append(loss.item())
                 
@@ -102,22 +112,22 @@ class Manager():
 
             mean_train_loss = np.mean(train_losses)
             print(f"#################### Epoch: {epoch} ####################")
-            print(f"Train loss: {mean_train_loss} || One epoch training time: {hours}hrs {minutes}mins {seconds}secs")
+            print(f"Train loss: {mean_train_loss} || One epoch training time: {hours} hrs {minutes} mins {seconds}secs")
 
             valid_loss, valid_time = self.validation()
             
             if valid_loss < self.best_loss:
-                if not os.path.exists(ckpt_dir):
-                    os.mkdir(ckpt_dir)
-                    
                 self.best_loss = valid_loss
-                state_dict = {
-                    'model_state_dict': self.model.state_dict(),
-                    'optim_state_dict': self.optim.state_dict(),
-                    'loss': self.best_loss
-                }
-                torch.save(state_dict, f"{ckpt_dir}/best_ckpt.tar")
-                print(f"***** Current best checkpoint is saved. *****")
+
+            if not os.path.exists(ckpt_dir):
+                os.mkdir(ckpt_dir)
+                
+            state_dict = {
+                'model_state_dict': self.model.state_dict(),
+                'optim_state_dict': self.optim.state_dict(),
+                'loss': valid_loss
+            }
+            torch.save(state_dict, f"{ckpt_dir}/ckpt_{epoch}_javi2.tar")
 
             print(f"Best valid loss: {self.best_loss}")
             print(f"Valid loss: {valid_loss} || One epoch validating time: {valid_time}")
