@@ -132,8 +132,10 @@ def beam_search(model, e_output, e_mask, trg_sp):
         
         if finished_count == beam_size:
             break
-    
+
     decoded_output = cur_queue.get().decoded
+    # cur_queue.print_scores()
+    # print(cur_queue.get().decoded)
     
     if decoded_output[-1] == eos_id:
         decoded_output = decoded_output[1:-1]
@@ -147,7 +149,7 @@ def calculate_bleu(model, method, list_src, list_trg):
     for (src, trg) in tqdm(zip(list_src, list_trg)):
         pred = inference(model, src.strip(), method)
         predictions.append(text_normalize(pred))
-        trg = text_normalize(trg.capitalize())
+        trg = text_normalize(trg)
         references.append([trg])     
     bleu = BLEUScore()
     return bleu(predictions, references) 
@@ -160,14 +162,14 @@ if __name__=='__main__':
     print(encoder_total_params, decoder_total_params)
 
     print("Loading checkpoint...")
-    for i in range(18, 19):
+    for i in range(10, 16):
         print(f"######### Epoch: {i} #########")
         checkpoint = torch.load(f"{ckpt_dir}/ckpt_{i}_javi2.tar")
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
 
-        input_sentence = "お客様がたくさんいます。その中で先生のクラスメートと友達が多いです。\n"
-        pred = translate(model, input_sentence, method="greedy")
+        input_sentence = "私の名前はYamada。\n"
+        pred = inference(model, input_sentence, method="beam")
         print(text_normalize(pred))
 
         print(f"Getting source/target data...")
@@ -178,7 +180,7 @@ if __name__=='__main__':
             trg_text_list = f.readlines()
 
         b = calculate_bleu(model, "greedy", src_text_list, trg_text_list).item()
-        with open("bleu-tatoeba.txt", "a", encoding="utf-8") as f:
+        with open(f"{ckpt_dir}/bleu-javi-tatoeba.txt", "a", encoding="utf-8") as f:
             f.write(f"{b} ckpt_{i}_javi2\n")
 
     

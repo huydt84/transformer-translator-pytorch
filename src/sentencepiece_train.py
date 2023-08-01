@@ -21,20 +21,30 @@ def train_sp(is_src=True):
         this_input_file = f"{DATA_DIR}/{SRC_RAW_DATA_NAME}"
         this_model_prefix = f"{SP_DIR}/{src_model_prefix}"
         vocab_size = sp_src_vocab_size
-    else:
-        this_input_file = f"{DATA_DIR}/{TRG_RAW_DATA_NAME}"
-        this_model_prefix = f"{SP_DIR}/{trg_model_prefix}"
-        vocab_size = sp_trg_vocab_size
 
-    config = template.format(this_input_file,
+        config = template.format(this_input_file,
                             pad_id,
                             sos_id,
                             eos_id,
                             unk_id,
                             this_model_prefix,
                             vocab_size,
-                            character_coverage,
+                            src_character_coverage,
                             model_type)
+    else:
+        this_input_file = f"{DATA_DIR}/{TRG_RAW_DATA_NAME}"
+        this_model_prefix = f"{SP_DIR}/{trg_model_prefix}"
+        vocab_size = sp_trg_vocab_size
+
+        config = template.format(this_input_file,
+                                pad_id,
+                                sos_id,
+                                eos_id,
+                                unk_id,
+                                this_model_prefix,
+                                vocab_size,
+                                trg_character_coverage,
+                                model_type)
 
     print(config)
 
@@ -47,6 +57,6 @@ def train_sp(is_src=True):
 
 if __name__=='__main__':
     train_sp(is_src=True)
-    # train_sp(is_src=False)
+    train_sp(is_src=False)
 
     

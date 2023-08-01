@@ -53,6 +53,7 @@ class Manager():
             checkpoint = torch.load(f"{ckpt_dir}/{ckpt_name}")
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.optim.load_state_dict(checkpoint['optim_state_dict'])
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             self.best_loss = checkpoint['loss']
         else:
             print("Initializing the model...")
@@ -125,9 +126,10 @@ class Manager():
             state_dict = {
                 'model_state_dict': self.model.state_dict(),
                 'optim_state_dict': self.optim.state_dict(),
+                'scheduler_state_dict': self.scheduler.state_dict(),
                 'loss': valid_loss
             }
-            torch.save(state_dict, f"{ckpt_dir}/ckpt_{epoch}_javi2.tar")
+            torch.save(state_dict, f"{ckpt_dir}/ckpt_javi_{epoch}.tar")
 
             print(f"Best valid loss: {self.best_loss}")
             print(f"Valid loss: {valid_loss} || One epoch validating time: {valid_time}")
@@ -170,7 +172,7 @@ class Manager():
         
         mean_valid_loss = np.mean(valid_losses)
         
-        return mean_valid_loss, f"{hours}hrs {minutes}mins {seconds}secs"
+        return mean_valid_loss, f"{hours} hrs {minutes} mins {seconds} secs"
 
     def inference(self, input_sentence, method):
         self.model.eval()

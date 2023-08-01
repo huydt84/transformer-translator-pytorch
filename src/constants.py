@@ -24,7 +24,8 @@ src_model_prefix = 'src_sp'
 trg_model_prefix = 'trg_sp'
 sp_src_vocab_size = 64000
 sp_trg_vocab_size = 64000
-character_coverage = 1.0
+src_character_coverage = 1.0
+trg_character_coverage = 1.0
 model_type = 'bpe'
 
 # Parameters for Transformer & training
@@ -43,6 +44,6 @@ d_model = 512
 d_ff = 1024
 d_k = d_model // num_heads
 drop_out_rate = 0.1
-num_epochs = 18
+num_epochs = 15
 beam_size = 3
 ckpt_dir = "sq128_8_6_1_512_1024"
