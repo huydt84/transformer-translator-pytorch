@@ -69,6 +69,7 @@ Argument | Type | Description | Default
 | `betas`         | `tuple`        | Exponential moving average of gradient and its square        | `(0.9, 0.98)`                                                |
 | `eps`           | `float`        | Small number added to denominator to prevent divided by 0.   | `1e-4`                                                       |
 | `batch_size`    | `int`          | The batch size.                                              | `16`                                                         |
+| `warmup_step`   | `int`          | The number of warmup step in lr scheduler.                   | `200`                                                         |
 | `seq_len`       | `int`          | The maximum length of a sentence.                            | `256`                                                        |
 | `num_heads`     | `int`          | The number of heads for Multi-head attention.                | `8`                                                          |
 | `num_layers`    | `int`          | The number of layers in the encoder & the decoder.           | `3`                                                          |
